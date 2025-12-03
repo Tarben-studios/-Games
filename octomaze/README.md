@@ -1,7 +1,9 @@
-My First Game Project
-This was my first game ever produced, built entirely in C++ during my first semester of college.
-
-Development Time: 2 weeks
+📊 Project Overview
+Aspect	Details
+🎓 Context	First semester college project
+⏳ Development Time	2 weeks
+💻 Language	C++
+🎯 Purpose	Introduction to game programming and computer graphics
 
 ✅ Implemented Mechanics
 Real-time motion capture
