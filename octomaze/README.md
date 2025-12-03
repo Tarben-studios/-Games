@@ -27,7 +27,7 @@
 
 ## 📋 Features Cut from Final Release
 
-#### 🔴 Completed but Not Included
+### 🔴 Completed but Not Included
 
 Feature	Status	Reason
 
