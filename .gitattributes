@@ -1,2 +1,5 @@
-*.gd linguagem=GDScript
-*.gd linguagem-detectable=true
+# .gitattributes - Configure para Godot
+*.gd linguist-language=GDScript
+*.tscn linguist-language=YAML
+*.tres linguist-language=YAML
+.import/ linguist-vendored=true
