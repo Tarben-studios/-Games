@@ -1,11 +1,18 @@
 📊 Project Overview
+
 Aspect	Details
+
 🎓 Context	First semester college project
+
 ⏳ Development Time	2 weeks
+
 💻 Language	C++
+
 🎯 Purpose	Introduction to game programming and computer graphics
 
+
 ✅ Implemented Mechanics
+
 Real-time motion capture
 
 Teleportation using matrices
