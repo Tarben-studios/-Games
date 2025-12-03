@@ -1,29 +1,38 @@
-📊 Project Overview
+# 📊 Project Overview
 
-Aspect	Details
+## Aspect	Details
 
-🎓 Context	First semester college project
+### 🎓 Context	First semester college project
 
-⏳ Development Time	2 weeks
+## ⏳ Development Time	2 weeks
 
-💻 Language	C++
+## 💻 Language	C++
 
-🎯 Purpose	Introduction to game programming and computer graphics
+### 🎯 Purpose	Introduction to game programming and computer graphics
+
+## ✨ Implemented Features
+
+### 🎯 Core Mechanics
+
+#### Feature	Description	Status
+
+## 🎬 Real-time Motion Capture	Dynamic character movement tracking	✅ Implemented
+
+## 🌀 Matrix-based Teleportation	Spatial translation using matrix operations	✅ Implemented
+
+## 📦 Object Pushing System	Physics interaction using matrix transformations	✅ Implemented
+
+## 🤖 Basic AI System	Simple enemy behavior and pathfinding	✅ Implemented
 
 
-✅ Implemented Mechanics
+## 📋 Features Cut from Final Release
 
-Real-time motion capture
+#### 🔴 Completed but Not Included
 
-Teleportation using matrices
+Feature	Status	Reason
 
-Object pushing using matrices
+## 💥 Object Explosion System	🔧 Developed	Removed for performance optimization
 
-Basic AI system
+## 🏆 Scoring System	⚠️ Partially Complete	Time constraints prevented completion
 
-🚫 Features Cut from Final Version
-Object explosion (completed but not included)
-
-Scoring system (not completed)
-
-Character transformation through interactions (not implemented)
+## 🔄 Character Transformation	📝 Designed	Complexity beyond project scope
