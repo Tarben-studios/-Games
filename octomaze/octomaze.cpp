@@ -1,720 +1,1344 @@
 #include <iostream>
 #include <unistd.h>
 #include <cmath>
-#include <fstream>
-#include <string> 
-#include <termios.h>
-#include "texto.h"
-#include <cstdlib>
+
+int fantasma_x = 0, fantasma_y = 0;
+int bloco_original_fantasma = 0;
+bool fantasma_inicializado = false;
 
 using namespace std;
-struct termios originalTermio;
 
-typedef struct falas{
-    string dicas;
-    string dialogos;
-}falas;
+const int larg = 16;
+const int alt = 16;
 
-const int largura = 30, altura = 18;
-//variaveis globais
-
-char ultecla;//ultima tecla usada
-
-int locx = -1,locy = -1; //variaveis de localização do player
-
-string atual; //valor da posição atual do player
-
-
-string prox; //pega o bloco da proxima posição
-
-int loc = -1, loc1 = -1; //variaveis de localização temporaria
-/************************/
-
-int timer = 0, pontos = 0; //variaveis de pontuação
-
-int bombas = 0, vidas = 3; // interativos do menu
-
-int uso = 0; //indice do timer
-
-int timer_global = 0, pontos_global = 0; //pontuação final
-
-int silver_key = -1,gold_key = -1;
-
-
-/************************/
-
-
-int nivel_atual = 0; //fase que está sendo jogada
-
-int fase_atual,linha,coluna;//referentes ao nivel atual
-
-/************************/
-
-int bomba_explosion = 4, timer_explosion = -1;
-
-string explosion = "off";
-
-
-char cima = 'w', baixo = 's',direita = 'd',esquerda = 'a', confirmar = 'z';
-
-
-
-string relogio[12] = {
-    "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙",
-    "🕚", "🕛"
+int v[larg][alt] = {
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1},
+    {1,0,1,0,1,0,1,0,1,0,1,1,1,1,0,1},
+    {1,0,1,0,0,0,1,0,0,0,0,0,0,1,0,1},
+    {1,0,1,1,1,1,1,1,1,1,1,1,0,1,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,1},
+    {1,0,1,1,1,1,1,1,1,1,0,1,0,1,0,1},
+    {1,0,1,0,0,0,0,0,0,1,0,1,0,0,0,1},
+    {1,0,1,0,1,1,1,1,0,1,0,1,1,1,0,1},
+    {1,0,1,0,1,0,3,1,0,1,0,0,0,1,0,1},
+    {1,0,1,0,1,0,1,1,0,1,1,1,0,1,0,1},
+    {1,0,0,0,1,0,0,0,0,0,0,1,0,1,0,1},
+    {1,1,1,0,1,1,1,1,1,1,0,1,0,1,0,1},
+    {1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1},
+    {1,2,1,1,1,1,1,1,0,1,0,0,0,0,0,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
-string alfabeto[26]={
-    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", 
-    "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", 
-    "u", "v", "w", "x", "y", "z"};
-
-void restaurarTerminal() {
-    tcsetattr(STDIN_FILENO, TCSANOW, &originalTermio);
-}
-void lerTecla() {
-    struct termios newt;
-    
-    
-    tcgetattr(STDIN_FILENO, &originalTermio);
-    
-    newt = originalTermio;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    
-    ultecla = getchar();
-    
-    
-    restaurarTerminal();
-}
-
-void limpar() {
-    system("clear");
-}
-
-
-void palavras(string v[18][30]){
-    if(ultecla == 'w' || ultecla == cima)
-    {
-        for(int i = 0;i<26;i++)
-        {
-            if(v[locx -1][locy] == alfabeto[i])
-            {
-                cout << "funcionou 2" <<endl; 
-                if((v[locx-1][locy] == "t" && v[locx-2][locy] == "c" && v[locx-3][locy] == "o" &&
-                    v[locx-4][locy] == "e" && v[locx-5][locy] == "r" && v[locx-6][locy] == "a" &&
-                    v[locx-7][locy] == "u" && v[locx-8][locy] == "o" && v[locx-9][locy] == "y"))
-                    {
-                    v[locx][locy] = "B$";
-                    atual = "B$";
-                    }
-            }
-        }
-
-    }
-
-}
-
-//vetor, largura, altura
-void pfase(string v[altura][largura]){
-    for(int i = 0; i < altura; i++)
-    {
-        for(int j = 0; j < largura; j++)
-        {   //cenario
-            if(v[i][j] == "-1")
-                cout << "\033[31m██\033[0m";
-            else if(v[i][j] == "0")
+template<int LARG, int ALT>
+void plab(int (&lab)[LARG][ALT], int largura, int altura) {
+    for (int i = 0; i < largura; i++) {
+        for (int j = 0; j < altura; j++) {
+            if (lab[i][j] == 0)
                 cout << "  ";
-            else if(v[i][j] == "1")
+            else if (lab[i][j] == -1)
+                cout << "\033[31m██\033[0m";
+            else if (lab[i][j] == 1)
                 cout << "██";
-            
-            //controlaveis
-            else if(v[i][j] == "oct")
+            else if (lab[i][j] == 2)
                 cout << "👾";
-            
-            else if(v[i][j] == "xxx")
-                cout << "???";
+            else if (lab[i][j] == 3)
+                cout << "⛳️";
+            else if (lab[i][j] == 4)
+                cout << "📍";
+            else if (lab[i][j] == 5)
+                cout << "🚪";
+            else if (lab[i][j] == 6)
+                cout << "🚧";
+            else if (lab[i][j] == 7)
+                cout << "📦";
+            else if (lab[i][j] == 8)
+                cout << "🌀";
+            else if (lab[i][j] == 9)
+                cout << "🌀";    
+            else if (lab[i][j] == 10)
+                cout << "👻";
+            else if (lab[i][j] == 11)
+                cout << "🚪";
+             
+        }
+        cout << endl;
+    }
+}
 
-            //interativos
-            else if(v[i][j] == "11")
-                cout << "💣";
-            else if(v[i][j] == "22")    
-                cout << "💥";
-            else if(v[i][j] == "33")    
-                cout << "🔥";
-            else if(v[i][j] == "44")
-                cout << "\033[37m⛆⛆\033[0m";
+int main() {
+    string direct, condicao;
+    int i, j, loc, loc1;
+    
+    cout << "Labirinto! Ache o caminho correto e fuja!" << endl
+         << "Movimentação via" << endl << "   W " <<endl
+         << " A S D " <<endl;
+    sleep(2);
+    cout << "\033[2J\033[H";
+    
+    
+    cout << endl << endl << endl << endl << endl << endl << endl << endl;
+    cout << "███████╗ █████╗ ███████╗███████╗     ██╗" << endl;
+    cout << "██╔════╝██╔══██╗██╔════╝██╔════╝    ███║" << endl;
+    cout << "█████╗  ███████║███████╗█████╗      ╚██║" << endl;
+    cout << "██╔══╝  ██╔══██║╚════██║██╔══╝       ██║" << endl;
+    cout << "██║     ██║  ██║███████║███████╗     ██║" << endl;
+    cout << "╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝     ╚═╝" << endl;
 
-            else if(v[i][j] == "13")
-                cout << "🗝️ ";
-            else if(v[i][j] == "23")
-                cout << "🔑";
-            else if(v[i][j] == "dicas")
-                cout <<"🪧 ";
+    //sleep(2);
+    cout << "\033[2J\033[H";
+    
+    // Encontra posição inicial do jogador
+    for (i = 0; i < larg; i++) {
+        for (j = 0; j < alt; j++) {
+            if (v[i][j] == 2) {
+                loc = i;
+                loc1 = j;
+            }
+        }
+    }
 
-            //money money money
-            else if(v[i][j] == "R$")
-                cout << "💎";
-            else if(v[i][j] == "B$")
-                cout << "💰";
-            else if(v[i][j] == "$$$")
-                cout << "💷";
-            else if(v[i][j] == "$$")
-                cout << "💶";
-            else if(v[i][j] == "$")
-                cout << "💵";
+    while(condicao == "vitoria") {    
+        plab(v, larg, alt);
+        cin >> direct;
         
-            //letras
-            else if(v[i][j] == "a")
-                cout << "\033[34m🇦 \033[0m";
-            else if(v[i][j] == "b")
-                cout << "\033[34m🇧 \033[0m";
-            else if(v[i][j] == "c")
-                cout << "\033[34m🇨 \033[0m";
-            else if(v[i][j] == "d")
-                cout << "\033[34m🇩 \033[0m";
-            else if(v[i][j] == "e")
-                cout << "\033[34m🇪 \033[0m";
-            else if(v[i][j] == "f")
-                cout << "\033[34m🇫 \033[0m";
-            else if(v[i][j] == "g")
-                cout << "\033[34m🇬 \033[0m";
-            else if(v[i][j] == "h")
-                cout << "\033[34m🇭 \033[0m";
-            else if(v[i][j] == "i")
-                cout << "\033[34m🇮 \033[0m";
-            else if(v[i][j] == "j")
-                cout << "\033[34m🇯 \033[0m";
-            else if(v[i][j] == "k")
-                cout << "\033[34m🇰 \033[0m";
-            else if(v[i][j] == "l")
-                cout << "\033[34m🇱 \033[0m";
-            else if(v[i][j] == "m")
-                cout << "\033[34m🇲 \033[0m";
-            else if(v[i][j] == "n")
-                cout << "\033[34m🇳 \033[0m";
-            else if(v[i][j] == "o")
-                cout << "\033[34m🇴 \033[0m";
-            else if(v[i][j] == "p")
-                cout << "\033[34m🇵 \033[0m";
-            else if(v[i][j] == "q")
-                cout << "\033[34m🇶 \033[0m";
-            else if(v[i][j] == "r")
-                cout << "\033[34m🇷 \033[0m";
-            else if(v[i][j] == "s")
-                cout << "\033[34m🇸 \033[0m";
-            else if(v[i][j] == "t")
-                cout << "\033[34m🇹 \033[0m";
-            else if(v[i][j] == "u")
-                cout << "\033[34m🇺 \033[0m";
-            else if(v[i][j] == "v")
-                cout << "\033[34m🇻 \033[0m";
-            else if(v[i][j] == "w")
-                cout << "\033[34m🇼 \033[0m";
-            else if(v[i][j] == "x")
-                cout << "\033[34m🇽 \033[0m";
-            else if(v[i][j] == "y")
-                cout << "\033[34m🇾 \033[0m";
-            else if(v[i][j] == "z")
-                cout << "\033[34m🇿 \033[0m";
-            
-        }
-    cout << endl;
-    }
-}
-
-void buscar_item(string v[18][30], string X){
-for(int i = 0; i < altura;i++)
-    {
-    for(int j = 0;j<largura;j++)
-        {
-        if(v[i][j] == X)
-        {
-        loc = i;
-        loc1 = j;
-        return;
-        }
-        }
-    }
-
-
-}
-
-//vetor,largura,altura,valor procurado
-void buscar_player(string v[altura][largura],string X){
-for(int i = 0; i < altura;i++)
-    {
-    for(int j = 0;j<largura;j++)
-        {
-        if(v[i][j] == X)
-        {
-        locx = i;
-        locy = j;
-        atual = v[locx][locy];
-        return;
-        }
-        }
-    }
-
-}
-
-//mostra o HUD
-void HUD(){ 
-cout << "🪙  " << pontos << "     " << relogio[uso] << " " << timer
-     << "     💣      " << bombas << "      ❤️ " << vidas <<   endl;
-if(silver_key > 0) cout << "🗝️   " << silver_key;
-if(gold_key > 0) cout <<   "🔑   " << gold_key;
-cout << endl;
-uso = (uso + 1)% 12;
-timer_global++;
-timer++;
-
-}
-
-//ler a fase atual
-void ler_fase(string v[altura][largura]){
-
-    static ifstream arquivo("fases.txt"); // Abre só uma vez
-    static bool primeira_vez = true;
-    
-    if (!arquivo.is_open()) {
-        cout << "Erro ao abrir o arquivo!" << endl;
-        return;
-    }
-    
-    // Lê os dados do arquivo
-    arquivo >> fase_atual;
-    
-    for (int i = 0; i < altura; i++) {
-        for (int j = 0; j < largura; j++) {
-            arquivo >> v[i][j]; 
-        }
-    }
-    (!primeira_vez);
-    // Arquivo permanece aberto para a próxima leitura!
-
-}
-
-//move o personagem
-void move(string v[altura][largura], int locx,int locy){
-    string armazena;
-
-if(ultecla == 'z' || ultecla == confirmar)
-    {
-        if(v[locx -1][locy] == "dicas")
-        cout <<"funciona";
-
-        else if(v[locx -1][locy] == "11") 
-        {
-            explosion = "on";
-            //beep();//CONCERTAR
-            
-        }
-    }
-
-    if(timer_global  != timer_explosion && explosion == "on")
-        {        
-        bomba_explosion--;
-
-            timer_explosion = timer_global;
-            if(bomba_explosion == 0)
-            {
-            buscar_item(v,"11");
-            for(int i = loc -1;i < loc + 2;i++)
-            {
-                for(int j = loc1 -1; j < loc1 +2;j++)
-                {
-                    v[i][j] = "22";
-                }
-            }
-            limpar();
-            pfase(v);
-            sleep(0.755);
-
-            for(int i = loc -1;i < loc + 2;i++)
-            {
-                for(int j = loc1 -1; j < loc1 +2;j++)
-                {
-                    v[i][j] = "33";
-                }
-            }
-            limpar();
-            pfase(v);
-            sleep(0.755);
-
-            for(int i = loc -1;i < loc + 2;i++)
-            {
-                for(int j = loc1 -1; j < loc1 +2;j++)
-                {
-                    v[i][j] = "44";
-                }
-            }
-
-            limpar();
-            pfase(v);
-            sleep(0.755);
-
-            for(int i = loc -1;i < loc + 2;i++)
-            {
-                for(int j = loc1 -1; j < loc1 +2;j++)
-                {
-                    v[i][j] = "0";
-                }
+        // Movimento para a direita
+        if(direct == "direita" || direct == "Direita" || direct == "Right" || direct == "D" || direct == "d") {
+            if(v[loc][loc1 + 1] == 3) {
+                condicao = "vitoria";
+                break;
             }
             
-            explosion = "off";
-            }
-        }    
-
-     if(ultecla == 'w')
-    {
-    prox = v[locx - 1][locy];
-    if(v[locx -1][locy] == "1")
-        v[locx -1][locy] = "-1";
-
-    else if(v[locx -1][locy] == "0")
-        {
-        v[locx -1][locy] = atual;
-        v[locx][locy] = "0";
-        }
-
-    else if(v[locx-1][locy] == "$")
-    {
-        pontos = pontos + 100;
-        v[locx][locy] = "0";
-        v[locx -1][locy] = atual;
-    }
-    else if(v[locx-1][locy] == "$$")
-    {
-        pontos = pontos + 300;
-        v[locx][locy] = "0";
-        v[locx -1][locy] = atual;
-    }
-
-    else if(v[locx-1][locy] == "$$$")
-    {
-        pontos = pontos + 500;
-        v[locx][locy] = "0";
-        v[locx -1][locy] = atual;
-    }
-    else if(v[locx-1][locy] == "B$")
-    {
-        pontos = pontos + 1000;
-        v[locx][locy] = "0";
-        v[locx -1][locy] = atual;
-    }   
-    else if(v[locx-1][locy] == "R$")
-    {
-        pontos = pontos + 5000;
-        v[locx][locy] = "0";
-        v[locx -1][locy] = atual;
-    }
-
-
-
-    //OBRIGATOTIAMENTE AS ULTIMAS FUNÇÔES DE MOVE
-    else if(v[locx-2][locy] == "0" )
-    {
-        v[locx][locy] = "0";
-        armazena = v[locx-1][locy];
-        
-        v[locx -2][locy] = armazena;
-        v[locx-1][locy] = atual;
-    }
-    
-
-
-    else
-        palavras(v);
-    
-    
-}
-    
-
-else if(ultecla == 's')
-    {
-    prox = v[locx + 1][locy];
-        if(v[locx +1][locy] == "1")
-        v[locx +1][locy] = "-1";
-
-    else if(v[locx +1][locy] == "0")
-        {
-        v[locx][locy] = "0";
-        v[locx +1][locy] = atual;
-        }
-    else if(v[locx+2][locy] == "0" )
-    {
-        v[locx][locy] = "0";
-        armazena = v[locx+1][locy];
-            
-        v[locx +2][locy] = armazena;
-        v[locx+1][locy] = atual;
-            
-    }
-
-    }
-
-else if(ultecla == 'a')
-    {
-    prox = v[locx][locy-1];
-        if(v[locx][locy - 1] == "1")
-        v[locx][locy -1] = "-1";
-
-    else if(v[locx][locy-1] == "0")
-        {
-        v[locx][locy] = "0";
-        v[locx][locy -1] = atual;
-        }
-    else if(v[locx][locy-2] == "0" )
-    {
-        v[locx][locy] = "0";
-        armazena = v[locx][locy-1];
-            
-        v[locx][locy-2] = armazena;
-        v[locx][locy-1] = atual;
-            
-    }
-
-    }
-
-else if(ultecla == 'd')
-    {
-    prox = v[locx][locy+1];
-        if(v[locx][locy + 1] == "1")
-        v[locx][locy +1] = "-1";
-
-    else if(v[locx][locy+1] == "0")
-        {
-        v[locx][locy] = "0";
-        v[locx][locy +1] = atual;
-        }
-    
-    else if(v[locx][locy+2] == "0" )
-    {
-        v[locx][locy] = "0";
-        armazena = v[locx][locy+1];
-            
-        v[locx][locy+2] = armazena;
-        v[locx][locy+1] = atual;
-            
-    }
-}
-}
-
-//limpa a tela
-
-//função referente a tudo sobre o menu
-void menu_principal(){
-int menu = 0;
-menu_puro();
-sleep(1);
-//escolher opção do menu principal
-while(ultecla != 'z' && ultecla != confirmar)
-{
-    lerTecla();
-    limpar();
-    if(ultecla == 'w' || ultecla == cima)
-        menu = (menu - 1 + 3)%3;
-    else if(ultecla == 's' || ultecla == baixo)
-        menu = (menu + 1)%3;
-
-    if(menu == 0)
-        menu_jogar();
-    else if(menu == 1)
-        menu_novo_jogo();
-    else if(menu == 2)
-        menu_option();
-    sleep(0.3);
-}
-limpar();
-
-if(menu == 0)
-    return;
-
-else if(menu == 1)
-    return;
-
-    //escolher opção dentro do option
-else if(menu == 2)
-    {   int option = 0;
-        ultecla = '`';
-        option_puro();
-        sleep(1);
-        while(ultecla != 'z' && ultecla != confirmar)
-        {
-        lerTecla();
-        limpar();
-        sleep(0.3);
-        if(ultecla == 'w' || ultecla == cima)
-            option = (option + 1)%3;
-        else if(ultecla == 's' || ultecla == baixo)
-            option = (option +2)%3;
-
-        if(option == 0)
-            option_alterar_controles();
-        else if(option == 1)
-            option_escolher_fase();
-        else if(option == 2)
-            option_modo_dificil();
-
-        
-        }
-        if(option == 0)
-        {
-        limpar();
-        int key_bind = 0;
-        keybind();
-            while(ultecla != 'x'){
-                lerTecla();
-                limpar();
-
-                if(ultecla == 'w' || ultecla == cima)
-                    key_bind = (key_bind + 3)%4;
-                else if(ultecla == 's' || ultecla == baixo)
-                    key_bind = (key_bind +1)%4;
-
-
-                if(key_bind == 0)
-                    keybind_cima(" ");
-                else if(key_bind == 1)
-                    keybind_baixo(" ");
-                else if(key_bind == 2)
-                    keybind_esquerda(" ");
-                else if(key_bind == 3)
-                    keybind_direita(" ");
-
-                if(ultecla == 'z' || ultecla == confirmar )
-                    limpar();
-                if((ultecla == 'z' || ultecla == confirmar )&& key_bind == 0)
-                {
-                    keybind_cima("sim");
-                        cout << "Digite uma tecla" <<endl;
-                    lerTecla();
-                    if(ultecla == 'w' || ultecla == 's' || ultecla == 'a' || ultecla == 'd' || ultecla == 'z' || ultecla == 'x')
-                    {
-                        cout << "Valor invalido!"<<endl;
-                        sleep(2);
-                        ultecla = '`';
-                    }
-                    else 
-                    cima = ultecla;
-                    limpar();
-                    keybind_cima(" ");
-                }
-                else if((ultecla == 'z' || ultecla == confirmar )&& key_bind == 1)
-                {
-                    keybind_baixo("sim");
-                        cout << "Digite uma tecla" <<endl;
-                    lerTecla();
-                    if(ultecla == 'w' || ultecla == 's' || ultecla == 'a' || ultecla == 'd' || ultecla == 'z' || ultecla == 'x')
-                    {
-                        cout << "Valor invalido!"<<endl;
-                        sleep(2);
-                        ultecla = '`';
-                    }
-                    else 
-                    baixo = ultecla;
-                    limpar();
-                    keybind_baixo(" ");
-                }
-
-                else if((ultecla == 'z' || ultecla == confirmar )&& key_bind == 2)
-                {
-                    keybind_esquerda("sim");
-                        cout << "Digite uma tecla" <<endl;
-                    lerTecla();
-                    if(ultecla == 'w' || ultecla == 's' || ultecla == 'a' || ultecla == 'd' || ultecla == 'z' || ultecla == 'x')
-                    {
-                        cout << "Valor invalido!"<<endl;
-                        sleep(2);
-                        ultecla = '`';
-                    }
-                    else 
-                        esquerda = ultecla;
-
-                    limpar();
-                    keybind_esquerda(" ");
-                }
-                else if((ultecla == 'z' || ultecla == confirmar )&& key_bind == 3)
-                {
-                    keybind_direita("sim");
-                        cout << "Digite uma tecla" <<endl;
-                    lerTecla();
-                    if(ultecla == 'w' || ultecla == 's' || ultecla == 'a' || ultecla == 'd' || ultecla == 'z' || ultecla == 'x')
-                    {
-                        cout << "Valor invalido!"<<endl;
-                        sleep(2);
-                        ultecla = '`';
-                    }
-                    else 
-                        direita = ultecla;
-                    limpar();
-                    keybind_direita(" ");
-                }
-            }
-        }
-    
-    
-        else if(option == 1)
-            {
+            if(v[loc][loc1 + 1] == 1 || v[loc][loc1 + 1] == -1) {
+                cout << "Você bateu na parede!" << endl;
+                v[loc][loc1 + 1] = -1;
                 
+            } else {
+                v[loc][loc1] = 0;
+                v[loc][loc1 + 1] = 2;
+                loc1++;
             }
+        }
+        // Movimento para a esquerda
+        else if(direct == "esquerda" || direct == "Esquerda" || direct == "Left" || direct == "a" || direct == "A") {
+            if(v[loc][loc1 - 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(v[loc][loc1 - 1] == 1 || v[loc][loc1 - 1] == -1) {
+                cout << "Você bateu na parede!" << endl;
+                v[loc][loc1 - 1] = -1;
+                
+            } else {
+                v[loc][loc1] = 0;
+                v[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+        }
+        // Movimento para cima
+        else if(direct == "cima" || direct == "Cima" || direct == "Up" || direct == "W" || direct == "w") {
+            if(v[loc - 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(v[loc - 1][loc1] == 1 || v[loc - 1][loc1] == -1) {
+                cout << "Você bateu na parede!" << endl;
+                v[loc - 1][loc1] = -1;
+                
+            } else {
+                v[loc][loc1] = 0;
+                v[loc - 1][loc1] = 2;
+                loc--;
+            }
+        }
+        // Movimento para baixo
+        else if(direct == "baixo" || direct == "Baixo" || direct == "Down" || direct == "S" || direct == "s") {
+            if(v[loc + 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(v[loc + 1][loc1] == 1 || v[loc + 1][loc1] == -1) {
+                cout << "Você bateu na parede!" << endl;
+                v[loc + 1][loc1] = -1;
+                
+            } else {
+                v[loc][loc1] = 0;
+                v[loc + 1][loc1] = 2;
+                loc++;
+            }
+        }
+        
+        cout << "\033[2J\033[H";
+    }   
+    cout << "\033[2J\033[H";
+    cout << endl << endl << endl << endl << endl << endl << endl << endl;
+    cout << "███████╗ █████╗ ███████╗███████╗    ██████╗ " << endl;
+    cout << "██╔════╝██╔══██╗██╔════╝██╔════╝   ╚════██╗" << endl;
+    cout << "█████╗  ███████║███████╗█████╗      █████╔╝" << endl;
+    cout << "██╔══╝  ██╔══██║╚════██║██╔══╝      ██╔═══╝" << endl;
+    cout << "██║     ██║  ██║███████║███████╗    ███████╗" << endl;
+    cout << "╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝    ╚══════╝" << endl;
+
+   // sleep(2);
+    cout << "\033[2J\033[H";
+
+    int v2[20][18] = {
+        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,2,0,0,0,0,1,0,0,1,0,6,1,0,0,0,0,1},
+        {1,1,1,1,0,1,1,0,1,1,0,1,1,0,1,1,1,1},
+        {1,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1},
+        {1,0,1,1,1,1,1,1,0,1,1,0,1,0,1,1,0,1},
+        {1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1},
+        {1,0,1,0,1,1,0,1,1,1,1,1,1,1,0,1,0,1},
+        {1,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1},
+        {1,0,1,1,1,0,1,1,1,1,1,1,0,1,1,1,0,1},
+        {1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1},
+        {1,1,1,0,1,1,1,4,1,1,0,1,1,1,0,1,0,1},
+        {1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,1,0,1},
+        {1,0,1,1,1,0,1,1,1,0,1,1,0,1,0,1,1,1},
+        {1,0,1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1},
+        {1,0,1,0,1,1,1,0,1,1,1,1,0,1,1,1,0,1},
+        {1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1},
+        {1,1,1,1,1,0,1,1,1,1,0,1,1,1,0,1,6,1},
+        {1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,3,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
+    };
     
+    // Reset condition for second maze
+    condicao = "";
     
-    
-    
+    // Find initial player position in second maze
+    for (i = 0; i < 20; i++) {
+        for (j = 0; j < 18; j++) {
+            if (v2[i][j] == 2) {
+                loc = i;
+                loc1 = j;
+            }
+        }
     }
 
-}
-
-void acicionar_dialogos(){
-    ifstream arquivo("fases.txt"); // Abre só uma vez
-    
-    if (!arquivo.is_open()) {
-        cout << "Erro ao abrir o arquivo!" << endl;
-        return;
+    while(condicao == "vitoria") {    
+        plab(v2, 20, 18);
+        cin >> direct;
+        
+        // Movimento para a direita
+        if(direct == "direita" || direct == "Direita" || direct == "Right" || direct == "D" || direct == "d") {
+            if(v2[loc][loc1 + 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(v2[loc][loc1 + 1] == 4) {
+                // Press button and remove obstacles
+                for(i = 0; i < 20; i++) {
+                    for(j = 0; j < 18; j++) {
+                        if(v2[i][j] == 6) v2[i][j] = 0;
+                    }
+                }
+                v2[loc][loc1] = 0;
+                v2[loc][loc1 + 1] = 2;
+                loc1++;
+            }
+            else if(v2[loc][loc1 + 1] == 1 || v2[loc][loc1 + 1] == -1) {
+                cout << "Você bateu na parede!" << endl;
+                v2[loc][loc1 + 1] = -1;
+                
+            } else if(v2[loc][loc1 + 1] == 0) {
+                v2[loc][loc1] = 0;
+                v2[loc][loc1 + 1] = 2;
+                loc1++;
+            }
+        }
+        // Movimento para a esquerda
+        else if(direct == "esquerda" || direct == "Esquerda" || direct == "Left" || direct == "a" || direct == "A") {
+            if(v2[loc][loc1 - 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(v2[loc][loc1 - 1] == 4) {
+                // Press button and remove obstacles
+                for(i = 0; i < 20; i++) {
+                    for(j = 0; j < 18; j++) {
+                        if(v2[i][j] == 6) v2[i][j] = 0;
+                    }
+                }
+                v2[loc][loc1] = 0;
+                v2[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+            else if(v2[loc][loc1 - 1] == 1 || v2[loc][loc1 - 1] == -1) {
+                cout << "Você bateu na parede!" << endl;
+                v2[loc][loc1 - 1] = -1;
+                
+            } else if(v2[loc][loc1 - 1] == 0) {
+                v2[loc][loc1] = 0;
+                v2[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+        }
+        // Movimento para cima
+        else if(direct == "cima" || direct == "Cima" || direct == "Up" || direct == "W" || direct == "w") {
+            if(v2[loc - 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(v2[loc - 1][loc1] == 4) {
+                // Press button and remove obstacles
+                for(i = 0; i < 20; i++) {
+                    for(j = 0; j < 18; j++) {
+                        if(v2[i][j] == 6) v2[i][j] = 0;
+                    }
+                }
+                v2[loc][loc1] = 0;
+                v2[loc - 1][loc1] = 2;
+                loc--;
+            }
+            else if(v2[loc - 1][loc1] == 1 || v2[loc - 1][loc1] == -1) {
+                cout << "Você bateu na parede!" << endl;
+                v2[loc - 1][loc1] = -1;
+                
+            } else if(v2[loc - 1][loc1] == 0) {
+                v2[loc][loc1] = 0;
+                v2[loc - 1][loc1] = 2;
+                loc--;
+            }
+        }
+        // Movimento para baixo
+        else if(direct == "baixo" || direct == "Baixo" || direct == "Down" || direct == "S" || direct == "s") {
+            if(v2[loc + 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(v2[loc + 1][loc1] == 4) {
+                // Press button and remove obstacles
+                for(i = 0; i < 20; i++) {
+                    for(j = 0; j < 18; j++) {
+                        if(v2[i][j] == 6) v2[i][j] = 0;
+                    }
+                }
+                v2[loc][loc1] = 0;
+                v2[loc + 1][loc1] = 2;
+                loc++;
+            }
+            else if(v2[loc + 1][loc1] == 1 || v2[loc + 1][loc1] == -1) {
+                cout << "Você bateu na parede!" << endl;
+                v2[loc + 1][loc1] = -1;
+                
+            } else if(v2[loc + 1][loc1] == 0) {
+                v2[loc][loc1] = 0;
+                v2[loc + 1][loc1] = 2;
+                loc++;
+            }
+        }
+        
+        cout << "\033[2J\033[H";
     }
+    cout << "\033[2J\033[H";
+    condicao = "andamento";
+    cout << endl << endl << endl << endl << endl << endl << endl << endl;
+   
+    cout << "███████╗ █████╗ ███████╗███████╗   ██████╗ " << endl;
+    cout << "██╔════╝██╔══██╗██╔════╝██╔════╝   ╚═══██╗" << endl;
+    cout << "█████╗  ███████║███████╗█████╗     █████╔╝" << endl;
+    cout << "██╔══╝  ██╔══██║╚════██║██╔══╝     ╚═══██╗" << endl;
+    cout << "██║     ██║  ██║███████║███████╗   ██████╗" << endl;
+    cout << "╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝   ╚═════╝" << endl;
+
+   // sleep(2);
+    cout << "\033[2J\033[H";
     
-
-}
-
-int main(){
-
-//bem_vindo();
-string fase[18][30] = {
-    {"1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1"},
-    {"1","0","y","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","o","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","u","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","a","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","r","0","0","0","0","0","0","0","0","R$","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","e","0","0","0","y","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","o","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","c","0","0","0","0","0","0","0","0","0","0","0","dicas","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","t","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","oct","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","0","0","0","0","0","0","0","22","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","0","11","0","0","0","0","0","0","0","s","0","0","t","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","0","0","0","0","13","0","0","0","0","i","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","1"},
-    {"1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1","1"}
+    int v5[20][20] = {
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,2,0,0,0,0,1,0,0,1,0,6,1,0,0,0,0,1,0,1},
+    {1,1,1,1,0,1,1,0,1,1,0,1,1,0,1,1,1,1,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,1,0,1},
+    {1,0,1,1,1,1,1,1,0,1,1,0,1,0,1,1,0,1,0,1},
+    {1,0,1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,1},
+    {1,0,1,0,1,1,0,1,1,1,1,1,1,1,0,1,0,1,1,1},
+    {1,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1},
+    {1,0,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,0,1},
+    {1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1},
+    {1,1,1,0,1,1,1,4,1,1,0,1,1,1,1,1,0,1,0,1},
+    {1,0,0,0,0,0,1,0,1,0,0,0,0,7,0,0,0,1,0,1},
+    {1,0,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,1,0,1},
+    {1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1},
+    {1,0,1,0,1,1,1,0,1,1,1,1,0,1,1,1,0,1,1,1},
+    {1,0,0,0,0,0,1,6,0,0,0,1,0,0,0,1,0,0,0,1},
+    {1,1,1,1,1,0,1,1,1,1,0,1,1,1,0,1,1,1,0,1},
+    {1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1},
+    {1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,3,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
-
-//menu_principal();
-//menu_principal();
-buscar_player(fase,"oct");
-while(ultecla != 'k' || vidas <= 0){
-    
-buscar_player(fase,atual);
-limpar();
-HUD();
-pfase(fase);
-lerTecla();
-move(fase,locx,locy);
-//push(fase);
+// Reset player position for the maze
+for (i = 0; i < 20; i++) {
+    for (j = 0; j < 20; j++) {
+        if (v5[i][j] == 2) {
+            loc = i;
+            loc1 = j;
+        }
+    }
 }
 
-return 0;}
+while(condicao != "vitoria") {    
+    // Clear screen and redraw maze
+    cout << "\033[2J\033[H";
+    plab(v5, 20, 20);
+    
+    cin >> direct;
+    
+    // Right movement
+    if(direct == "direita" || direct == "Direita" || direct == "Right" || direct == "D" || direct == "d") {
+        if(loc1 + 1 < 20 && v5[loc][loc1 + 1] == 3) {
+            condicao = "vitoria";
+            break;
+        }
+        
+        if(loc1 + 1 < 20 && v5[loc][loc1 + 1] == 4) {
+            // Press button and remove obstacles
+            for(i = 0; i < 20; i++) {
+                for(j = 0; j < 20; j++) {
+                    if(v5[i][j] == 6) v5[i][j] = 0;
+                }
+            }
+            v5[loc][loc1] = 0;
+            v5[loc][loc1 + 1] = 2;
+            loc1++;
+        }
+        else if(loc1 + 1 < 20 && (v5[loc][loc1 + 1] == 1 || v5[loc][loc1 + 1] == -1)) {
+            cout << "Você bateu na parede!" << endl;
+            v5[loc][loc1 + 1] = -1;
+            
+        } 
+        else if(loc1 + 2 < 20 && v5[loc][loc1 + 1] == 7 && v5[loc][loc1 + 2] == 0) {
+            v5[loc][loc1 + 1] = 2;
+            v5[loc][loc1 + 2] = 7;
+            v5[loc][loc1] = 0;
+            loc1++;
+        }    
+        else if(loc1 + 1 < 20 && v5[loc][loc1 + 1] == 0) {
+            v5[loc][loc1] = 0;
+            v5[loc][loc1 + 1] = 2;
+            loc1++;
+        }
+    }
+    // Left movement
+    else if(direct == "esquerda" || direct == "Esquerda" || direct == "Left" || direct == "a" || direct == "A") {
+        if(loc1 - 1 >= 0 && v5[loc][loc1 - 1] == 3) {
+            condicao = "vitoria";
+            break;
+        }
+        
+        if(loc1 - 1 >= 0 && v5[loc][loc1 - 1] == 4) {
+            // Press button and remove obstacles
+            for(i = 0; i < 20; i++) {
+                for(j = 0; j < 20; j++) {
+                    if(v5[i][j] == 6) v5[i][j] = 0;
+                }
+            }
+            v5[loc][loc1] = 0;
+            v5[loc][loc1 - 1] = 2;
+            loc1--;
+        }
+        else if(loc1 - 1 >= 0 && (v5[loc][loc1 - 1] == 1 || v5[loc][loc1 - 1] == -1)) {
+            cout << "Você bateu na parede!" << endl;
+            v5[loc][loc1 - 1] = -1;
+            
+        } 
+        else if(loc1 - 2 >= 0 && v5[loc][loc1 - 1] == 7 && v5[loc][loc1 - 2] == 0) {
+            v5[loc][loc1 - 1] = 2;
+            v5[loc][loc1 - 2] = 7;
+            v5[loc][loc1] = 0;
+            loc1--;
+        }
+        else if(loc1 - 1 >= 0 && v5[loc][loc1 - 1] == 0) {
+            v5[loc][loc1] = 0;
+            v5[loc][loc1 - 1] = 2;
+            loc1--;
+        }
+    }
+    // Up movement
+    else if(direct == "cima" || direct == "Cima" || direct == "Up" || direct == "W" || direct == "w") {
+        if(loc - 1 >= 0 && v5[loc - 1][loc1] == 3) {
+            condicao = "vitoria";
+            break;
+        }
+        
+        if(loc - 1 >= 0 && v5[loc - 1][loc1] == 4) {
+            // Press button and remove obstacles
+            for(i = 0; i < 20; i++) {
+                for(j = 0; j < 20; j++) {
+                    if(v5[i][j] == 6) v5[i][j] = 0;
+                }
+            }
+            v5[loc][loc1] = 0;
+            v5[loc - 1][loc1] = 2;
+            loc--;
+        }
+        else if(loc - 1 >= 0 && (v5[loc - 1][loc1] == 1 || v5[loc - 1][loc1] == -1)) {
+            cout << "Você bateu na parede!" << endl;
+            v5[loc - 1][loc1] = -1;
+            
+        } 
+        else if(loc - 2 >= 0 && v5[loc - 1][loc1] == 7 && v5[loc - 2][loc1] == 0) {
+            v5[loc - 1][loc1] = 2;
+            v5[loc - 2][loc1] = 7;
+            v5[loc][loc1] = 0;
+            loc--;
+        }
+        else if(loc - 1 >= 0 && v5[loc - 1][loc1] == 0) {
+            v5[loc][loc1] = 0;
+            v5[loc - 1][loc1] = 2;
+            loc--;
+        }
+    }
+    // Down movement
+    else if(direct == "baixo" || direct == "Baixo" || direct == "Down" || direct == "S" || direct == "s") {
+        if(loc + 1 < 20 && v5[loc + 1][loc1] == 3) {
+            condicao = "vitoria";
+            break;
+        }
+        
+        if(loc + 1 < 20 && v5[loc + 1][loc1] == 4) {
+            // Press button and remove obstacles
+            for(i = 0; i < 20; i++) {
+                for(j = 0; j < 20; j++) {
+                    if(v5[i][j] == 6) v5[i][j] = 0;
+                }
+            }
+            v5[loc][loc1] = 0;
+            v5[loc + 1][loc1] = 2;
+            loc++;
+        }
+        else if(loc + 1 < 20 && (v5[loc + 1][loc1] == 1 || v5[loc + 1][loc1] == -1)) {
+            cout << "Você bateu na parede!" << endl;
+            v5[loc + 1][loc1] = -1;
+            
+        } 
+        else if(loc + 2 < 20 && v5[loc + 1][loc1] == 7 && v5[loc + 2][loc1] == 0) {
+            v5[loc + 1][loc1] = 2;
+            v5[loc + 2][loc1] = 7;
+            v5[loc][loc1] = 0;
+            loc++;
+        }
+        else if(loc + 1 < 20 && v5[loc + 1][loc1] == 0) {
+            v5[loc][loc1] = 0;
+            v5[loc + 1][loc1] = 2;
+            loc++;
+        }
+    }
+}    
+    cout << "\033[2J\033[H";
+    cout << endl << endl << endl << endl << endl << endl << endl << endl;
+    
+    
+    
+cout << "███╗   ███╗██╗   ██╗███╗   ██╗██████╗  ██████╗     ██████╗ " << endl;
+cout << "████╗ ████║██║   ██║████╗  ██║██╔══██╗██╔═══██╗   ╚════██╗" << endl;
+cout << "██╔████╔██║██║   ██║██╔██╗ ██║██║  ██║██║   ██║    █████╔╝" << endl;
+cout << "██║╚██╔╝██║██║   ██║██║╚██╗██║██║  ██║██║   ██║   ██╔═══╝ " << endl;
+cout << "██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██████╔╝╚██████╔╝    ██████╗" << endl;
+cout << "╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝  ╚═════╝     ╚═════╝" << endl <<endl;
+    
+    
+    cout << "███████╗ █████╗ ███████╗███████╗     ██╗" << endl;
+    cout << "██╔════╝██╔══██╗██╔════╝██╔════╝    ███║" << endl;
+    cout << "█████╗  ███████║███████╗█████╗      ╚██║" << endl;
+    cout << "██╔══╝  ██╔══██║╚════██║██╔══╝       ██║" << endl;
+    cout << "██║     ██║  ██║███████║███████╗     ██║" << endl;
+    cout << "╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝     ╚═╝" << endl;    
+    
+    sleep(2);
+const int malt = 20;
+const int mlarg = 21;
+int mv1[20][21] = {
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,2,6,0,0,8,1,9,0,0,0,0,1,0,0,0,0,0,0,0,1},
+    {1,0,1,1,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1},
+    {1,0,1,0,0,0,1,0,0,0,1,0,1,0,0,0,0,0,1,0,1},
+    {1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1},
+    {1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,1},
+    {1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1},
+    {1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,1},
+    {1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1},
+    {1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,1},
+    {1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1},
+    {1,0,1,0,1,0,0,0,0,0,1,0,1,0,7,0,0,0,1,0,1},
+    {1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1,0,1,0,1},
+    {1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,7,1,0,1,0,1},
+    {1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1},
+    {1,0,0,0,4,0,1,0,1,0,0,0,0,0,1,0,1,0,0,0,1},
+    {1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1},
+    {1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,3,1},
+    {1,0,1,1,1,1,1,1,1,1,1,0,1,0,1,6,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
+};
+    
+    for (i = 0; i < 20; i++) {
+    for (j = 0; j < 21; j++) {
+        if (mv1[i][j] == 2) {
+            loc = i;
+            loc1 = j;
+        }
+    }
+}
+    condicao = "jogando";
+    
+    while(condicao != "vitoria") {    
+        // Limpa a tela e redesenha o labirinto
+        cout << "\033[2J\033[H";
+        plab(mv1, malt,mlarg);
+        cin >> direct;
+        
+        // Movimento para direita
+        if(direct == "direita" || direct == "Direita" || direct == "Right" || direct == "D" || direct == "d") {
+            if(loc1 + 1 < mlarg && mv1[loc][loc1 + 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc1 + 1 < mlarg && mv1[loc][loc1 + 1] == 4) {
+                // Pressiona botão e remove obstáculos
+                for(int i = 0; i < malt; i++) {
+                    for(int j = 0; j < mlarg; j++) {
+                        if(mv1[i][j] == 6) mv1[i][j] = 0;
+                    }
+                }
+                mv1[loc][loc1] = 0;
+                mv1[loc][loc1 + 1] = 2;
+                loc1++;
+            }
+            else if(loc1 + 1 < mlarg && (mv1[loc][loc1 + 1] == 1 || mv1[loc][loc1 + 1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv1[loc][loc1 + 1] = -1;
+            } 
+            else if(loc1 + 2 < mlarg && mv1[loc][loc1 + 1] == 7 && mv1[loc][loc1 + 2] == 0) {
+                mv1[loc][loc1 + 1] = 2;
+                mv1[loc][loc1 + 2] = 7;
+                mv1[loc][loc1] = 0;
+                loc1++;
+            }    
+            else if(loc1 + 1 < mlarg && mv1[loc][loc1 + 1] == 0) {
+                mv1[loc][loc1] = 0;
+                mv1[loc][loc1 + 1] = 2;
+                loc1++;
+            }
+            else if(mv1[loc][loc1+1] == 8){
+                for(int i = 0; i < malt; i++)
+                {
+                    for(int j = 0; j < mlarg; j++)
+                    {
+                        if(mv1[i][j] == 9) 
+                        {
+                        mv1[loc][loc1]=0;
+                        mv1[i][j+1] = 2;
+                        loc = i;
+                        loc1 = j+1;
+                        break;
+                        }
+                    }
+                }
+            }
+        }
+        // Movimento para esquerda
+        else if(direct == "esquerda" || direct == "Esquerda" || direct == "Left" || direct == "A" || direct == "a") {
+            if(loc1 - 1 >= 0 && mv1[loc][loc1 - 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc1 - 1 >= 0 && mv1[loc][loc1 - 1] == 4) {
+                // Pressiona botão e remove obstáculos
+                for(int i = 0; i < malt; i++) {
+                    for(int j = 0; j < mlarg; j++) {
+                        if(mv1[i][j] == 6) mv1[i][j] = 0;
+                    }
+                }
+                mv1[loc][loc1] = 0;
+                mv1[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+            else if(loc1 - 1 >= 0 && (mv1[loc][loc1 - 1] == 1 || mv1[loc][loc1 - 1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv1[loc][loc1 - 1] = -1;
+            } 
+            else if(loc1 - 2 >= 0 && mv1[loc][loc1 - 1] == 7 && mv1[loc][loc1 - 2] == 0) {
+                mv1[loc][loc1 - 1] = 2;
+                mv1[loc][loc1 - 2] = 7;
+                mv1[loc][loc1] = 0;
+                loc1--;
+            }
+            else if(loc1 - 1 >= 0 && mv1[loc][loc1 - 1] == 0) {
+                mv1[loc][loc1] = 0;
+                mv1[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+            else if(mv1[loc][loc1-1] == 9){
+                for(int i = 0; i < malt; i++)
+                {
+                    for(int j = 0; j < mlarg; j++)
+                    {
+                        if(mv1[i][j] == 8) 
+                        {
+                        mv1[loc][loc1]=0;
+                        mv1[i][j-1] = 2;
+                        loc = i;
+                        loc1 = j-1;
+                        break;
+                        }
+                    }
+                }
+            }    
+            
+        }
+        // Movimento para cima
+        else if(direct == "cima" || direct == "Cima" || direct == "Up" || direct == "W" || direct == "w") {
+            if(loc - 1 >= 0 && mv1[loc - 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc - 1 >= 0 && mv1[loc - 1][loc1] == 4) {
+                // Pressiona botão e remove obstáculos
+                for(int i = 0; i < malt; i++) {
+                    for(int j = 0; j < mlarg; j++) {
+                        if(mv1[i][j] == 6) mv1[i][j] = 0;
+                    }
+                }
+                mv1[loc][loc1] = 0;
+                mv1[loc - 1][loc1] = 2;
+                loc--;
+            }
+            else if(loc - 1 >= 0 && (mv1[loc - 1][loc1] == 1 || mv1[loc - 1][loc1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv1[loc - 1][loc1] = -1;
+            } 
+            else if(loc - 2 >= 0 && mv1[loc - 1][loc1] == 7 && mv1[loc - 2][loc1] == 0) {
+                mv1[loc - 1][loc1] = 2;
+                mv1[loc - 2][loc1] = 7;
+                mv1[loc][loc1] = 0;
+                loc--;
+            }
+            else if(loc - 1 >= 0 && mv1[loc - 1][loc1] == 0) {
+                mv1[loc][loc1] = 0;
+                mv1[loc - 1][loc1] = 2;
+                loc--;
+            }
+        }
+        // Movimento para baixo
+        else if(direct == "baixo" || direct == "Baixo" || direct == "Down" || direct == "S" || direct == "s") {
+            if(loc + 1 < malt && mv1[loc + 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc + 1 < malt && mv1[loc + 1][loc1] == 4) {
+                // Pressiona botão e remove obstáculos
+                for(int i = 0; i < malt; i++) {
+                    for(int j = 0; j < mlarg; j++) {
+                        if(mv1[i][j] == 6) mv1[i][j] = 0;
+                    }
+                }
+                mv1[loc][loc1] = 0;
+                mv1[loc + 1][loc1] = 2;
+                loc++;
+            }
+            else if(loc + 1 < malt && (mv1[loc + 1][loc1] == 1 || mv1[loc + 1][loc1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv1[loc + 1][loc1] = -1;
+            } 
+            else if(loc + 2 < malt && mv1[loc + 1][loc1] == 7 && mv1[loc + 2][loc1] == 0) {
+                mv1[loc + 1][loc1] = 2;
+                mv1[loc + 2][loc1] = 7;
+                mv1[loc][loc1] = 0;
+                loc++;
+            }
+            else if(loc + 1 < malt && mv1[loc + 1][loc1] == 0) {
+                mv1[loc][loc1] = 0;
+                mv1[loc + 1][loc1] = 2;
+                loc++;
+            }
+        }
+    }
+    condicao ="jogando";
+    
+cout << "███╗   ███╗██╗   ██╗███╗   ██╗██████╗  ██████╗     ██████╗ " << endl;
+cout << "████╗ ████║██║   ██║████╗  ██║██╔══██╗██╔═══██╗   ╚════██╗" << endl;
+cout << "██╔████╔██║██║   ██║██╔██╗ ██║██║  ██║██║   ██║    █████╔╝" << endl;
+cout << "██║╚██╔╝██║██║   ██║██║╚██╗██║██║  ██║██║   ██║   ██╔═══╝ " << endl;
+cout << "██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██████╔╝╚██████╔╝    ██████╗" << endl;
+cout << "╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝  ╚═════╝     ╚═════╝" << endl <<endl;
+
+    cout << endl << endl << endl << endl << endl << endl << endl << endl;
+    cout << "███████╗ █████╗ ███████╗███████╗    ██████╗ " << endl;
+    cout << "██╔════╝██╔══██╗██╔════╝██╔════╝   ╚════██╗" << endl;
+    cout << "█████╗  ███████║███████╗█████╗      █████╔╝" << endl;
+    cout << "██╔══╝  ██╔══██║╚════██║██╔══╝      ██╔═══╝" << endl;
+    cout << "██║     ██║  ██║███████║███████╗    ███████╗" << endl;
+    cout << "╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝    ╚══════╝" << endl;
+    
+    sleep(2);
+
+    const int malt2= 20;
+    const int mlarg2 = 22;
+    
+    int mv2[20][22] = {
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,2,0,0,1,0,0,0,0,0,0,1,4,0,0,0,0,0,0,0,8,1},
+    {1,1,1,0,1,0,1,1,1,1,0,1,6,1,7,1,1,1,1,0,1,1},
+    {1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1},
+    {1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1},
+    {1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,1},
+    {1,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1},
+    {1,9,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1},
+    {1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1},
+    {1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,1},
+    {1,0,1,0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,1},
+    {1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1},
+    {1,1,1,7,1,0,1,1,7,1,1,1,1,1,0,1,1,1,0,1,1,1},
+    {1,0,0,0,1,0,1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1},
+    {1,0,1,1,1,1,1,0,1,1,1,1,0,1,1,1,0,1,1,1,0,1},
+    {1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1},
+    {1,0,1,0,1,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1},
+    {1,0,0,0,6,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,0,1,0,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
+};
+    
+    for (i = 0; i < 20; i++) {
+    for (j = 0; j < 20; j++) {
+        if (mv2[i][j] == 2) {
+            loc = i;
+            loc1 = j;}
+        }
+    }
+    
+     while(condicao != "vitoria") {    
+        // Limpa a tela e redesenha o labirinto
+        cout << "\033[2J\033[H";
+        plab(mv2, malt2,mlarg2);
+        cin >> direct;
+        
+        // Movimento para direita
+        if(direct == "direita" || direct == "Direita" || direct == "Right" || direct == "D" || direct == "d") {
+            if(loc1 + 1 < mlarg2 && mv2[loc][loc1 + 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc1 + 1 < mlarg2 && mv2[loc][loc1 + 1] == 4) {
+                // Pressiona botão e remove obstáculos
+                for(int i = 0; i < malt2; i++) {
+                    for(int j = 0; j < mlarg2; j++) {
+                        if(mv2[i][j] == 6) mv2[i][j] = 0;
+                    }
+                }
+                mv2[loc][loc1] = 0;
+                mv2[loc][loc1 + 1] = 2;
+                loc1++;
+            }
+            else if(loc1 + 1 < mlarg2 && (mv2[loc][loc1 + 1] == 1 || mv2[loc][loc1 + 1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv2[loc][loc1 + 1] = -1;
+            } 
+            else if(loc1 + 2 < mlarg2 && mv2[loc][loc1 + 1] == 7 && mv2[loc][loc1 + 2] == 0) {
+                mv2[loc][loc1 + 1] = 2;
+                mv2[loc][loc1 + 2] = 7;
+                mv2[loc][loc1] = 0;
+                loc1++;
+            }    
+            else if(loc1 + 1 < mlarg2 && mv2[loc][loc1 + 1] == 0) {
+                mv2[loc][loc1] = 0;
+                mv2[loc][loc1 + 1] = 2;
+                loc1++;
+            }
+            else if(mv2[loc][loc1+1] == 8){
+                for(int i = 0; i < malt2; i++)
+                {
+                    for(int j = 0; j < mlarg2; j++)
+                    {
+                        if(mv2[i][j] == 9) 
+                        {
+                        mv2[loc][loc1]=0;
+                        mv2[i][j+1] = 2;
+                        loc = i;
+                        loc1 = j+1;
+                        break;
+                        }
+                    }
+                }
+            }
+        }
+        // Movimento para esquerda
+        else if(direct == "esquerda" || direct == "Esquerda" || direct == "Left" || direct == "A" || direct == "a") {
+            if(loc1 - 1 >= 0 && mv2[loc][loc1 - 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc1 - 1 >= 0 && mv2[loc][loc1 - 1] == 4) {
+                // Pressiona botão e remove obstáculos
+                for(int i = 0; i < malt2; i++) {
+                    for(int j = 0; j < mlarg2; j++) {
+                        if(mv2[i][j] == 6) mv2[i][j] = 0;
+                    }
+                }
+                mv2[loc][loc1] = 0;
+                mv2[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+            else if(loc1 - 1 >= 0 && (mv2[loc][loc1 - 1] == 1 || mv2[loc][loc1 - 1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv2[loc][loc1 - 1] = -1;
+            } 
+            else if(loc1 - 2 >= 0 && mv2[loc][loc1 - 1] == 7 && mv2[loc][loc1 - 2] == 0) {
+                mv2[loc][loc1 - 1] = 2;
+                mv2[loc][loc1 - 2] = 7;
+                mv2[loc][loc1] = 0;
+                loc1--;
+            }
+            else if(loc1 - 1 >= 0 && mv2[loc][loc1 - 1] == 0) {
+                mv2[loc][loc1] = 0;
+                mv2[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+            else if(mv2[loc][loc1-1] == 9){
+                for(int i = 0; i < malt2; i++)
+                {
+                    for(int j = 0; j < mlarg2; j++)
+                    {
+                        if(mv2[i][j] == 8) 
+                        {
+                        mv2[loc][loc1]=0;
+                        mv2[i][j-1] = 2;
+                        loc = i;
+                        loc1 = j-1;
+                        break;
+                        }
+                    }
+                }
+            }    
+            
+        }
+        // Movimento para cima
+        else if(direct == "cima" || direct == "Cima" || direct == "Up" || direct == "W" || direct == "w") {
+            if(loc - 1 >= 0 && mv2[loc - 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc - 1 >= 0 && mv2[loc - 1][loc1] == 4) {
+                // Pressiona botão e remove obstáculos
+                for(int i = 0; i < malt2; i++) {
+                    for(int j = 0; j < mlarg2; j++) {
+                        if(mv2[i][j] == 6) mv2[i][j] = 0;
+                    }
+                }
+                mv2[loc][loc1] = 0;
+                mv2[loc - 1][loc1] = 2;
+                loc--;
+            }
+            else if(loc - 1 >= 0 && (mv2[loc - 1][loc1] == 1 || mv2[loc - 1][loc1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv2[loc - 1][loc1] = -1;
+            } 
+            else if(loc - 2 >= 0 && mv2[loc - 1][loc1] == 7 && mv2[loc - 2][loc1] == 0) {
+                mv2[loc - 1][loc1] = 2;
+                mv2[loc - 2][loc1] = 7;
+                mv2[loc][loc1] = 0;
+                loc--;
+            }
+            else if(loc - 1 >= 0 && mv2[loc - 1][loc1] == 0) {
+                mv2[loc][loc1] = 0;
+                mv2[loc - 1][loc1] = 2;
+                loc--;
+            }
+        }
+        // Movimento para baixo
+        else if(direct == "baixo" || direct == "Baixo" || direct == "Down" || direct == "S" || direct == "s") {
+            if(loc + 1 < malt2 && mv2[loc + 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc + 1 < malt2 && mv2[loc + 1][loc1] == 4) {
+                // Pressiona botão e remove obstáculos
+                for(int i = 0; i < malt2; i++) {
+                    for(int j = 0; j < mlarg2; j++) {
+                        if(mv2[i][j] == 6) mv2[i][j] = 0;
+                    }
+                }
+                mv2[loc][loc1] = 0;
+                mv2[loc + 1][loc1] = 2;
+                loc++;
+            }
+            else if(loc + 1 < malt2 && (mv2[loc + 1][loc1] == 1 || mv2[loc + 1][loc1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv2[loc + 1][loc1] = -1;
+            } 
+            else if(loc + 2 < malt2 && mv2[loc + 1][loc1] == 7 && mv2[loc + 2][loc1] == 0) {
+                mv2[loc + 1][loc1] = 2;
+                mv2[loc + 2][loc1] = 7;
+                mv2[loc][loc1] = 0;
+                loc++;
+            }
+            else if(loc + 1 < malt2 && mv2[loc + 1][loc1] == 0) {
+                mv2[loc][loc1] = 0;
+                mv2[loc + 1][loc1] = 2;
+                loc++;
+            }
+        }
+    }
+    condicao = " ";
+    cout << "\033[2J\033[H";
+    
+cout << endl << endl << endl << endl << endl << endl << endl << endl;
+cout << "\033[1;91m"; // Ativa vermelho brilhante (1 = negrito, 91 = vermelho claro)
+cout << "███████╗ █████╗ ███████╗███████╗" << endl;
+cout << "██╔════╝██╔══██╗██╔════╝██╔════╝" << endl;
+cout << "█████╗  ███████║███████╗█████╗  " << endl;
+cout << "██╔══╝  ██╔══██║╚════██║██╔══╝  " << endl;
+cout << "██║     ██║  ██║███████║███████╗" << endl;
+cout << "╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝" << endl;
+
+cout << endl; // Espaço entre as palavras
+
+cout << "███████╗██╗███╗   ██╗ █████╗ ██╗     " << endl;
+cout << "██╔════╝██║████╗  ██║██╔══██╗██║     " << endl;
+cout << "█████╗  ██║██╔██╗ ██║███████║██║     " << endl;
+cout << "██╔══╝  ██║██║╚██╗██║██╔══██║██║     " << endl;
+cout << "██║     ██║██║ ╚████║██║  ██║███████╗" << endl;
+cout << "╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝" << endl;
+
+sleep(3);
+    
+cout << "\033[0m"; // Reseta a cor para o padrão
+    
+    
+cout << endl << endl << endl << endl << endl << endl << endl << endl 
+     << "Fuja!"<<endl;
+    
+    cout << "\033[0m";
+    sleep(2);
+    
+    
+    
+    
+const int malt3 = 20;
+const int mlar3 = 22;
+int loq = 0;
+int loq1 = 0;
+// New maze layout (mv3)
+int mv3[20][22] = {
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,2,0,0,0,8,1,0,0,0,0,0,1,0,0,0,0,0,0,10,11,1},
+    {1,0,1,1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1},
+    {1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1},
+    {1,0,1,0,1,0,1,1,1,1,1,1,1,0,1,1,1,1,0,1,0,1},
+    {1,0,0,0,1,0,0,1,1,1,1,1,0,0,0,0,0,0,0,1,4,1},
+    {1,1,1,1,1,0,0,1,0,0,0,1,0,1,1,1,1,1,1,1,1,1},
+    {1,0,0,0,0,0,0,1,0,3,0,1,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,1,0,1,0,0,0,1,0,1,0,1,0,1,0,1,0,1},
+    {1,0,1,1,0,1,0,0,6,7,6,0,0,1,0,1,0,1,0,1,0,1},
+    {1,0,1,0,0,1,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1},
+    {1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,1,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,1,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1},
+    {1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,9,0,1},
+    {1,1,1,1,1,0,4,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,7,0,0,0,1},
+    {1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,0,1},
+    {1,0,1,0,0,0,1,0,6,5,1,0,0,0,1,0,0,0,1,0,0,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
+};
+
+    // Find initial player position (2)
+    for (int i = 0; i < 20; i++) {
+        for (int j = 0; j < 22; j++) {
+            if (mv3[i][j] == 2) {
+                loc = i;
+                loc1 = j;
+            }
+        }
+    }
+
+    // Find initial ghost position (10)
+    for (int i = 0; i < 20; i++) {
+        for (int j = 0; j < 22; j++) {
+            if (mv3[i][j] == 10) {
+                loq = i;
+                loq1 = j;
+                fantasma_x = i;
+                fantasma_y = j;
+                bloco_original_fantasma = 0; // Espaço vazio
+                fantasma_inicializado = true;
+                break;
+            }
+        }
+        if (fantasma_inicializado) break;
+    }
+
+    while(condicao != "vitoria") {    
+        // Clear screen and redraw maze
+        cout << "\033[2J\033[H";
+        plab(mv3, malt3, mlar3);
+        cin >> direct;
+        
+        // Right movement
+        if(direct == "direita" || direct == "Direita" || direct == "Right" || direct == "D" || direct == "d") {
+            if(loc1 + 1 < mlar3 && mv3[loc][loc1 + 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc1 + 1 < mlar3 && mv3[loc][loc1 + 1] == 4) {
+                // Press button and remove obstacles
+                for(int i = 0; i < malt3; i++) {
+                    for(int j = 0; j < mlar3; j++) {
+                        if(mv3[i][j] == 6) mv3[i][j] = 0;
+                    }
+                }
+                mv3[loc][loc1] = 0;
+                mv3[loc][loc1 + 1] = 2;
+                loc1++;
+            }
+            else if(loc1 + 1 < mlar3 && (mv3[loc][loc1 + 1] == 1 || mv3[loc][loc1 + 1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv3[loc][loc1 + 1] = -1;
+            } 
+            else if(loc1 + 2 < mlar3 && mv3[loc][loc1 + 1] == 7 && mv3[loc][loc1 + 2] == 0) {
+                mv3[loc][loc1 + 1] = 2;
+                mv3[loc][loc1 + 2] = 7;
+                mv3[loc][loc1] = 0;
+                loc1++;
+            }    
+            else if(loc1 + 1 < mlar3 && mv3[loc][loc1 + 1] == 0) {
+                mv3[loc][loc1] = 0;
+                mv3[loc][loc1 + 1] = 2;
+                loc1++;
+            }
+            else if(mv3[loc][loc1+1] == 8){
+                for(int i = 0; i < malt3; i++) {
+                    for(int j = 0; j < mlar3; j++) {
+                        if(mv3[i][j] == 9) {
+                            mv3[loc][loc1] = 0;
+                            mv3[i][j+1] = 2;
+                            loc = i;
+                            loc1 = j+1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        // Left movement
+        else if(direct == "esquerda" || direct == "Esquerda" || direct == "Left" || direct == "A" || direct == "a") {
+            if(loc1 - 1 >= 0 && mv3[loc][loc1 - 1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            
+            if(loc1 - 1 >= 0 && mv3[loc][loc1 - 1] == 4) {
+                // Press button and remove obstacles
+                for(int i = 0; i < malt3; i++) {
+                    for(int j = 0; j < mlar3; j++) {
+                        if(mv3[i][j] == 6) mv3[i][j] = 0;
+                    }
+                }
+                mv3[loc][loc1] = 0;
+                mv3[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+            else if(loc1 - 1 >= 0 && (mv3[loc][loc1 - 1] == 1 || mv3[loc][loc1 - 1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv3[loc][loc1 - 1] = -1;
+            } 
+            else if(loc1 - 2 >= 0 && mv3[loc][loc1 - 1] == 7 && mv3[loc][loc1 - 2] == 0) {
+                mv3[loc][loc1 - 1] = 2;
+                mv3[loc][loc1 - 2] = 7;
+                mv3[loc][loc1] = 0;
+                loc1--;
+            }
+            else if(loc1 - 1 >= 0 && mv3[loc][loc1 - 1] == 0) {
+                mv3[loc][loc1] = 0;
+                mv3[loc][loc1 - 1] = 2;
+                loc1--;
+            }
+            else if(mv3[loc][loc1-1] == 9){
+                for(int i = 0; i < malt3; i++) {
+                    for(int j = 0; j < mlar3; j++) {
+                        if(mv3[i][j] == 8) {
+                            mv3[loc][loc1] = 0;
+                            mv3[i][j-1] = 2;
+                            loc = i;
+                            loc1 = j-1;
+                            break;
+                        }
+                    }
+                }
+            }    
+        }
+        // Up movement
+        else if(direct == "cima" || direct == "Cima" || direct == "Up" || direct == "W" || direct == "w") {
+            if(loc - 1 >= 0 && mv3[loc - 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            else if(mv3[loc-1][loc1] == 11){
+                for(int i = 0; i < malt3; i++) {
+                    for(int j = 0; j < mlar3; j++) {
+                        if(mv3[i][j] == 5) {
+                            mv3[loc][loc1] = 0;
+                            mv3[i-1][j] = 2;
+                            loc = i-1;
+                            loc1 = j;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            
+            if(loc - 1 >= 0 && mv3[loc - 1][loc1] == 4) {
+                // Press button and remove obstacles
+                for(int i = 0; i < malt3; i++) {
+                    for(int j = 0; j < mlar3; j++) {
+                        if(mv3[i][j] == 6) mv3[i][j] = 0;
+                    }
+                }
+                mv3[loc][loc1] = 0;
+                mv3[loc - 1][loc1] = 2;
+                loc--;
+            }
+            else if(loc - 1 >= 0 && (mv3[loc - 1][loc1] == 1 || mv3[loc - 1][loc1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv3[loc - 1][loc1] = -1;
+            } 
+            else if(loc - 2 >= 0 && mv3[loc - 1][loc1] == 7 && mv3[loc - 2][loc1] == 0) {
+                mv3[loc - 1][loc1] = 2;
+                mv3[loc - 2][loc1] = 7;
+                mv3[loc][loc1] = 0;
+                loc--;
+            }
+            else if(loc - 1 >= 0 && mv3[loc - 1][loc1] == 0) {
+                mv3[loc][loc1] = 0;
+                mv3[loc - 1][loc1] = 2;
+                loc--;
+            }
+        }
+        // Down movement
+        else if(direct == "baixo" || direct == "Baixo" || direct == "Down" || direct == "S" || direct == "s") {
+            if(loc + 1 < malt3 && mv3[loc + 1][loc1] == 3) {
+                condicao = "vitoria";
+                break;
+            }
+            else if(mv3[loc+1][loc1] == 5){
+                for(int i = 0; i < malt3; i++) {
+                    for(int j = 0; j < mlar3; j++) {
+                        if(mv3[i][j] == 11) {
+                            mv3[loc][loc1] = 0;
+                            mv3[i+1][j] = 2;
+                            loc = i+1;
+                            loc1 = j;
+                            break;
+                        }
+                    }
+                }
+            }
+            if(loc + 1 < malt3 && mv3[loc + 1][loc1] == 4) {
+                // Press button and remove obstacles
+                for(int i = 0; i < malt3; i++) {
+                    for(int j = 0; j < mlar3; j++) {
+                        if(mv3[i][j] == 6) mv3[i][j] = 0;
+                    }
+                }
+                mv3[loc][loc1] = 0;
+                mv3[loc + 1][loc1] = 2;
+                loc++;
+            }
+            else if(loc + 1 < malt3 && (mv3[loc + 1][loc1] == 1 || mv3[loc + 1][loc1] == -1)) {
+                cout << "Você bateu na parede!" << endl;
+                mv3[loc + 1][loc1] = -1;
+            } 
+            else if(loc + 2 < malt3 && mv3[loc + 1][loc1] == 7 && mv3[loc + 2][loc1] == 0) {
+                mv3[loc + 1][loc1] = 2;
+                mv3[loc + 2][loc1] = 7;
+                mv3[loc][loc1] = 0;
+                loc++;
+            }
+            else if(loc + 1 < malt3 && mv3[loc + 1][loc1] == 0) {
+                mv3[loc][loc1] = 0;
+                mv3[loc + 1][loc1] = 2;
+                loc++;
+            }
+        }
+        
+        // --- MOVIMENTAÇÃO DO FANTASMA ---
+        // 1. Restaura o bloco na posição atual do fantasma
+        mv3[fantasma_x][fantasma_y] = bloco_original_fantasma;
+        
+        // 2. Calcula direção para o jogador
+        int dx = loc - fantasma_x;
+        int dy = loc1 - fantasma_y;
+        int novo_x = fantasma_x;
+        int novo_y = fantasma_y;
+        
+        // 3. Escolhe a melhor direção
+        if (abs(dx) > abs(dy)) {
+            if (dx > 0) novo_x++; // Direita
+            else novo_x--;        // Esquerda
+        } else {
+            if (dy > 0) novo_y++; // Baixo
+            else novo_y--;       // Cima
+        }
+        
+        // 4. Verifica se a nova posição é válida
+        if (novo_x >= 0 && novo_x < malt3 && novo_y >= 0 && novo_y < mlar3) {
+            // Atualiza a posição do fantasma
+            bloco_original_fantasma = mv3[novo_x][novo_y];
+            mv3[novo_x][novo_y] = 10;
+            fantasma_x = novo_x;
+            fantasma_y = novo_y;
+        } else {
+            // Se movimento inválido, mantém na posição atual
+            mv3[fantasma_x][fantasma_y] = 10;
+        }
+        
+        // Atualiza as variáveis globais do fantasma
+        loq = fantasma_x;
+        loq1 = fantasma_y;
+        
+        // Verificação de colisão
+        if ((abs(locx - fantasma_x) <= 0 && abs(locy - fantasma_y;) <= 1)) {
+            
+            cout << "YOU LOSE!!!" << endl;
+            sleep(5);
+            return 1;
+        }
+        
+} 
+    
+    
+    if(condicao == "vitoria")  
+    {  
+    cout << "\033[2J\033[H";
+cout << "██████╗  █████╗ ██████╗  █████╗ ██████╗ ███████╗ ███╗   ██╗ ███████╗" << endl;
+cout << "██╔══██╗██╔══██╗██╔══██╗██╔══██╗██╔══██╗██╔════╝ ████╗  ██║ ██╔════╝" << endl;
+cout << "██████╔╝███████║██████╔╝███████║██████╔╝█████╗   ██╔██╗ ██║ ███████╗" << endl;
+cout << "██╔═══╝ ██╔══██║██╔══██╗██╔══██║██╔══██╗██╔══╝   ██║╚██╗██║ ╚════██║" << endl;
+cout << "██║     ██║  ██║██║  ██║██║  ██║██║  ██║███████╗ ██║ ╚████║ ███████║" << endl;
+cout << "╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝ ╚═╝  ╚═══╝ ╚══════╝" << endl << endl <<endl;
+
+sleep(2);
+
+     cout << "          Você completou a beta do jogo" <<endl;
+    }
+    return 0;
+}
