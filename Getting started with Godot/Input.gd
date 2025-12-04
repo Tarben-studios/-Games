@@ -20,5 +20,5 @@ The `if` function in Godot can be used together with many other built-in Godot f
 
   if Input.get_axis("negative", "positive")
 # 1. Recebe dois parâmetros, uma para cada direção
-# 2. Retorna -1 para o primeiro, 1 para o segundo, 0 para nenhum
+# 2. Retorna valores entre -1 para o primeiro e 1 para o segundo, 0 para nenhum
 
